@@ -26,7 +26,6 @@ int main(int argc, char *argv[])
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     char *servIP;                    /* IP address of server */
     int nBytes;              		 /* Length of received response */
-    vector<user> sendingList;       //unused, and likly to change
     struct command c1;              //message that is sent
     bool done = false;
 
@@ -92,7 +91,7 @@ int main(int argc, char *argv[])
         }
         if(c1.messagetype==0)
         {
-            printf("SUCCESS: user added\n");
+            printf("SUCCESS: user added\n");            
         }
         else//initialize failed
         {
@@ -187,25 +186,28 @@ int main(int argc, char *argv[])
         else
         {
             printf("%s not a command\n",messagetype);
+            c1.messagetype = 1;
         }
         //----------------------------------------------------------------------------------------------
 
-
-        /* Send the struct to the server */
-        if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
-            DieWithError("sendto() sent a different number of bytes than expected");
-
-        /* Receive a response */
-
-        fromSize = sizeof(fromAddr);
-
-        if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
-            DieWithError("recvfrom() failed");
-
-        if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
+        if(c1.messagetype!=1)
         {
-                fprintf(stderr,"Error: received a packet from unknown source.\n");
-                exit(1);
+            /* Send the struct to the server */
+            if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
+                DieWithError("sendto() sent a different number of bytes than expected");
+
+            /* Receive a response */
+
+            fromSize = sizeof(fromAddr);
+
+            if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
+                DieWithError("recvfrom() failed");
+
+            if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
+            {
+                    fprintf(stderr,"Error: received a packet from unknown source.\n");
+                    exit(1);
+            }
         }
 
         //printing the result from the server--------------------------------------------------------
@@ -230,8 +232,7 @@ int main(int argc, char *argv[])
             strcpy(c1.group,"");
             strcpy(c1.ip,"");
             c1.port = -1;
-            c1.code = -1;
-            c1.sendingList = vector<user>();            
+            c1.code = -1;          
             strcpy(c1.message,"");
         }
         else

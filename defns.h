@@ -14,8 +14,7 @@ struct command
 	char group[50];
     char ip[16];
     int port;
-    int code;
-	std::vector<user> sendingList;
+    int code = -1;
 	char groups[10][50];
 	char message[200];
 };
