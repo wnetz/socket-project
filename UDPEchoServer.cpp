@@ -7,6 +7,7 @@
 #include <string.h>     /* for memset() */
 #include <unistd.h>     /* for close() */
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 using namespace std;
@@ -58,8 +59,8 @@ int main(int argc, char *argv[])
         /* Block until receive message from a client */
         if ((recvMsgSize = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
-        //determin command
-        if(c1.messagetype == 2)
+        //determin command-----------------------------------------------------------------------
+        if(c1.messagetype == 2)//register done
         {
             printf("register request from %s\n", inet_ntoa(echoClntAddr.sin_addr));
             for(int i=0;i<users.size();i++)
@@ -74,20 +75,20 @@ int main(int argc, char *argv[])
                 c1.messagetype = 0;
                 struct user newUser;
                 strcpy(newUser.name,c1.name);
-                strcpy(newUser.ip,c1.ip);
+                strcpy(newUser.ip,inet_ntoa(echoClntAddr.sin_addr));
                 newUser.port=c1.port;
                 users.push_back(newUser);
                 printf("SUCCESS: added user %s on %s from port %d\n", users[users.size()-1].name,users[users.size()-1].ip,users[users.size()-1].port);
-                strcpy(c1.message,"user added");
+                strcpy(c1.message,"user added\n");
             }
             else
             {
                 printf("FAILURE: user by the name %s already exists\n",c1.name);
-                strcpy(c1.message,"user already exists");
+                strcpy(c1.message,"user already exists\n");
             }
             
         }
-        else if(c1.messagetype == 3)
+        else if(c1.messagetype == 3)///create done
         {
             printf("create group %s\n", c1.group);
             for(int i=0;i<groups.size();i++)
@@ -105,15 +106,15 @@ int main(int argc, char *argv[])
                 strcpy(newUser.name,c1.group);
                 groups[groups.size()-1].push_back(newUser);
                 printf("SUCCESS: group \"%s\" added\n", groups[groups.size()-1][0].name);
-                strcpy(c1.message,"group created");
+                strcpy(c1.message,"group created\n");
             }
             else
             {
-                printf("FAILURE: group %s already exists\n",c1.name);
-                strcpy(c1.message,"group already exists");
+                printf("FAILURE: group %s already exists\n",c1.group);
+                strcpy(c1.message,"group already exists\n");
             }
         }
-        else if(c1.messagetype == 4)
+        else if(c1.messagetype == 4)//join done
         {
             printf("adding %s to group \"%s\"\n", c1.name, c1.group);
             int usr = -1;
@@ -156,132 +157,136 @@ int main(int argc, char *argv[])
                         groups[grp].push_back(curentUser); 
 
                         printf("SUCCESS: user %s added to group \"%s\"\n",groups[grp][groups[grp].size()-1].name,groups[grp][0].name);
-                        strcpy(c1.message,"user added to group");
+                        strcpy(c1.message,"user added to group\n");
                     }
                     else
                     {
                         c1.messagetype = 1;
                         printf("FAILURE: user %s is already in group \"%s\"\n",c1.name,c1.group);
-                        strcpy(c1.message,"user is alredy in group");
+                        strcpy(c1.message,"user is alredy in group\n");
                     }
                 }
                 else
                 {
                     c1.messagetype = 1;
                     printf("FAILURE: group \"%s\" does not exists\n",c1.group);
-                    strcpy(c1.message,"no such group");
+                    strcpy(c1.message,"no such group\n");
                 }
             }
             else
             {
                 c1.messagetype = 1;
                 printf("FAILURE: user by the name %s does not exists\n",c1.name);
-                strcpy(c1.message,"no such user");
+                strcpy(c1.message,"no such user\n");
             }        
         }
-        else if(c1.messagetype == 5)
+        else if(c1.messagetype == 5)//query-lists done
         {
-            printf("geting list for %s\n", c1.group);
-            int usr = -1;
-            //find user
-            for(int i=0;i<users.size();i++)
+            printf("geting list of groups %s\n");
+            c1.messagetype = 0;
+            c1.code = groups.size();
+            for(int i=0;i<groups.size();i++)
             {
-                if(strcmp(users[i].name,c1.name)==0)
-                {
-                    usr = i;
-                }
+                strcpy(c1.groups[i], groups[i][0].name);
             }
-            if(usr >= 0)
+            if(c1.code>0)
+            {                
+                printf("SUCCESS: there are %d groups: %s",c1.code,c1.groups[0]);
+                for(int i=1;i<c1.code;i++)
+                {
+                    cout << ", " << c1.groups[i];
+                }
+                cout << "\n";
+            }
+            else
             {
-                int grp = -1;
-                //find group
+                printf("SUCCESS: there are %d groups\n",c1.code);
+            }
+            
+            strcpy(c1.message,"groups found");
+            
+        }
+        else if(c1.messagetype == 6)//im-start FS
+        {
+
+        }
+        else if(c1.messagetype == 7)//im-complete FS
+        {
+
+        }
+        else if(c1.messagetype == 8)//leave FS
+        {
+
+        }
+        else if(c1.messagetype == 9)//save done
+        {
+            printf("create file \"%s\" with groups and users\n", c1.name);
+            ofstream saveFile(c1.name);
+
+            if(!saveFile)
+            {
+                c1.messagetype = 1;
+                printf("FAILURE: file \"%s\" could not be created\n",c1.name);
+                strcpy(c1.message,"file could not be created\n");
+            }
+            else
+            {
+                saveFile<<users.size()<<"\n";
+                for(int i=0;i<users.size();i++)
+                {
+                    saveFile<<users[i].name<<" "<<users[i].ip<<" "<<users[i].port<<"\n";
+                }
+                saveFile<<groups.size()<<"\n";
                 for(int i=0;i<groups.size();i++)
                 {
-                    if(strcmp(groups[i][0].name,c1.group)==0)
+                    saveFile<<groups[i][0].name<<" "<<groups[i].size()-1<<"\n";
+                    for(int j=1;j<groups[i].size();j++)
                     {
-                        grp = i;
+                        saveFile<<groups[i][j].name<<" "<<groups[i][j].ip<<" "<<groups[i][j].port<<"\n";
                     }
                 }
-                if(grp >= 0)
-                {
-                    int loc = -1;
-                    for(int i=0;i<groups[grp].size();i++)
-                    {
-                        if(strcmp(groups[grp][i].name,c1.name)==0)
-                        {
-                            loc = i;
-                        }
-                    }
-                    if(loc >= 0)
-                    {
-                        printf("%d\n", loc);
-                        c1.messagetype = 0;
-                        //deep copy
-                        struct user curentUser;
 
-                        strcpy(curentUser.name,groups[grp][loc].name);
-                        strcpy(curentUser.ip,groups[grp][loc].ip);  
-                        curentUser.port = groups[grp][loc].port; 
-                        c1.sendingList.push_back(curentUser);
-                        for(int i=1;i<groups[grp].size();i++) 
-                        {
-                            if(i!=loc)
-                            {
-                                c1.sendingList.push_back(groups[grp][i]);
-                            }
-
-                        }
-                        printf("SUCCESS: sending list: %s",c1.sendingList[0].name);
-                        for(int i=1;i<c1.sendingList.size();i++)
-                        {
-                            cout << ", " << c1.sendingList[i].name;
-                        }
-                        cout << "\n";
-                        strcpy(c1.message,"group created");
-                    }
-                    else
-                    {
-                        c1.messagetype = 1;
-                        printf("FAILURE: user %s is not in group \"%s\"\n",c1.name,c1.group);
-                        strcpy(c1.message,"no such group");
-                    }
-                }
-                else
+                saveFile.close();
+                c1.messagetype = 0;
+                printf("SUCCESS: file \"%s\" created\n", c1.name);
+                strcpy(c1.message,"file created\n");
+            }            
+        }
+        else if(c1.messagetype == 10)//exit todo/FS
+        {
+            printf("leave request from %s\n", c1.name);
+            for(int i=0;i<users.size();i++)
+            {
+                if(strcmp(c1.name,users[i].name) == 0)
                 {
-                    c1.messagetype = 1;
-                    printf("FAILURE: group \"%s\" does not exists\n",c1.group);
-                    strcpy(c1.message,"no such group");
+                    c1.messagetype = 0;
+                    users.erase(users.begin()+i);
                 }
+            }
+            if(c1.messagetype == 0)
+            {
+                for(int i=0;i<groups.size();i++)
+                {
+                    for(int j=1;j<groups[i].size();j++)
+                    {
+                        if(strcmp(c1.name,groups[i][j].name) == 0)
+                        {
+                            groups[i].erase(groups[i].begin()+j);
+                        }
+                    }
+                }
+                printf("SUCCESS: user %s removed\n", c1.name);
+                strcpy(c1.message,"user removed\n");
             }
             else
             {
                 c1.messagetype = 1;
-                printf("FAILURE: user by the name %s does not exists\n",c1.name);
-                strcpy(c1.message,"no such user");
+                printf("FAILURE: user %s does not exist\n", c1.name);
+                strcpy(c1.message,"user does not exists\n");
             }
         }
-        else if(c1.messagetype == 6)
-        {
-
-        }
-        else if(c1.messagetype == 7)
-        {
-
-        }
-        else if(c1.messagetype == 8)
-        {
-
-        }
-        else if(c1.messagetype == 9)
-        {
-
-        }
-        else if(c1.messagetype == 10)
-        {
-
-        }
-        
-
+        //----------------------------------------------------------------------------------------------
+        cout<<"\n";
 
         /* Send received datagram back to the client */
         if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(struct command))

@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 struct user
 {
 	char name[50];
@@ -15,5 +16,6 @@ struct command
     int port;
     int code;
 	std::vector<user> sendingList;
+	char groups[10][50];
 	char message[200];
 };
