@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
         }
         else if(c1.messagetype == 5)//query-lists done
         {
-            printf("geting list of groups %s\n");
+            printf("geting list of groups\n");
             c1.messagetype = 0;
             c1.code = groups.size();
             for(int i=0;i<groups.size();i++)

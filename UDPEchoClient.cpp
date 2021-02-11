@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
             }
             if(c1.code > -1)
             {
-                cout<<c1.groups[0];
+                cout<<"groups: " << c1.groups[0];
                 for(int i=1;i<c1.code;i++)
                 {
                     cout << ", " << c1.groups[i];
