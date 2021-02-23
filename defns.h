@@ -15,6 +15,8 @@ struct command
     char ip[16];
     int port;
     int code = -1;
+	int code2 = -1;
 	char groups[10][50];
-	char message[200];
+	char message[2000];
+	user groupIM[10];
 };
