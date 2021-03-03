@@ -23,6 +23,8 @@ bool done = false;
 bool got = false;
 bool got2 = false;
 bool rc = false;
+bool take = false;
+string input;
 struct sockaddr_in echoServAddr; /* Echo server address */
 
 void DieWithError(const char *errorMessage) /* External error handling function */
@@ -32,8 +34,7 @@ void DieWithError(const char *errorMessage) /* External error handling function 
 }
 
 void messagethread()
-{
-    cout << "in cmd" << got << " " << got2 << endl;
+{    
     struct sockaddr_in fromAddr;
     struct sockaddr_in msmAddr;
     unsigned short msmPort;
@@ -56,31 +57,29 @@ void messagethread()
 
     /* Bind to the local address */
     if (bind(sock, (struct sockaddr *) &msmAddr, sizeof(msmAddr)) < 0)
-        DieWithError("bind() failed");
+        DieWithError("bind() failed: a user on that ip is already using that port");
     fromSize = sizeof(fromAddr);
 
+    // get message
     if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
         DieWithError("recvfrom() failed");
     rc = true;
-
-    if(c1.messagetype == 0)
+    //cout << "in cmd" << got << " " << got2 << endl;
+    //SUCCESS
+    if(c1.messagetype != 1)
     {
         cout<<c1.code<<" "<<c1.code2<<endl;
-        printf("SUCCESS: %s\n",c1.message);
+        if(c1.messagetype != 6)
+        {
+            printf("SUCCESS: %s\n",c1.message);
+        }
         if(strcmp(c1.message,"user removed\n") == 0)
         {
             done = true;
         }
-        if(c1.code == 0)
+        if(c1.code > -2)
         {
-            c1.messagetype = 7;
-            /* Send the struct to the server */
-            if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
-                DieWithError("sendto() sent a different number of bytes than expected");
-        }
-        else if(c1.code > -1)
-        {
-            if(c1.code2 == 5)
+            if(c1.code2 == -1)//query
             {
                 cout<<"groups: " << c1.groups[0];
                 for(int i=1;i<c1.code;i++)
@@ -89,24 +88,24 @@ void messagethread()
                 }
                 cout << "\n";
             }
-            else if(c1.code2 == 6)
+            else//im start
             {
                 bool start = false;
-                cout << c1.groupIM[0].name <<" "<<c1.name<< " "<< strcmp(c1.groupIM[0].name,c1.name)<<endl;
-                if(strcmp(c1.groupIM[0].name,c1.name) == 0)
+                cout << c1.code<<endl;
+                if(c1.code2 == c1.code)// if start of msm
                 {
-                    string input;
-                    cout << "enter message: ";
-                    getline(cin, input);                    
+                    take = true;
+                    cout << "enter message: "; 
+                    while(take){}
                     strcpy(c1.message, input.c_str());
                     cout<<endl;
                     start = true;
                 }
                 else
                 {
-                    cout << c1.message << endl;
+                    cout <<"messege: " << c1.message << endl;
                 }
-                
+                // print who is left in chain
                 cout<<"members: " << c1.groupIM[0].name;
                 for(int i=1;i<c1.code;i++)
                 {
@@ -114,8 +113,10 @@ void messagethread()
                 }
                 cout << "\n";
 
+                //subtract one from number of people
                 c1.code = c1.code - 1;
 
+                //next in chain
                 msmIP = c1.groupIM[c1.code].ip;
                 msmPort = c1.groupIM[c1.code].port;
 
@@ -126,32 +127,49 @@ void messagethread()
                 msmAddr.sin_addr.s_addr = inet_addr(msmIP);  /* Server IP address */
                 msmAddr.sin_port   = htons(msmPort);     /* Server port */
                 
+                //send to next
                 if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &msmAddr, sizeof(msmAddr)) != sizeof(struct command))
-                    DieWithError("sendto() sent a different number of bytes than expected");
+                        DieWithError("sendto() sent a different number of bytes than expected");
+                if(start)
+                {
+                    cout << "msg sent\n";
+                    //wait for msm to come back
+                    if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
+                        DieWithError("recvfrom() failed");
+                    cout << "msg receved\n";
+                    //send im complete to server
+                    c1.code = -2;
+                    c1.code2 = -2;
+                    c1.messagetype = 7;
+                    if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
+                        DieWithError("sendto() sent a different number of bytes than expected");
+                }
             }
         }
         
-        c1.code = -1;
+        //reset codes
+        c1.code = -2;
+        c1.code2 = -2;
     }
     else
     {
         printf("FAILURE: %s",c1.message);
     }    
     got2 = true;
-    cout << "done cmd" << got << " " << got2 << endl;
+    //cout << "done cmd" << got << " " << got2 << endl;
     close(sock);
     return;
 }
 
 string getString()
 {
-    cout << "in string\n";
-    cout << "\nEnter command-----: ";
+    //cout << "in string\n";
+    //cout << "\nEnter command-----: ";
     string input;
     getline(cin, input);
-    cout << "\n";
+    //cout << "\n";
     got = true;
-    cout << "done string" << got << " " << got2 << endl;
+    //cout << "done string" << got << " " << got2 << endl;
     return input;
 }
 
@@ -206,14 +224,10 @@ int main(int argc, char *argv[])
     
     //initialize with server-----------------------------------------------------------------------------
     do
-    {   
-        string in;
+    {          
         c1.messagetype = 2;
         cout << "name: ";
         scanf("%s",&c1.name);
-        cout << "ip: ";
-        scanf("%s",&c1.ip);
-        strcpy(c1.ip,"255.255.255.255");
         do
         {
             cout << "port(40001-40499): ";
@@ -276,12 +290,22 @@ int main(int argc, char *argv[])
             futureObj = async(getString);
         }
         //std::thread th(getString, &promiseObj);
-        if(futureObj.valid() && futureObj.wait_for(span) == std::future_status::ready) 
+        if(got) 
         { 
-            cout << "string" << got << " " << got2 << endl;
+            //cout << "string" << got << " " << got2 << endl;
             got = false;
             string in;
-            in = futureObj.get();
+            if(take)
+            {
+                input = futureObj.get();
+                take = false;
+                in = "take";
+            }
+            else
+            {                
+                in = futureObj.get();
+            }
+            
             //th.join();
             char echoBuffer[100];
             int loc = in.find(" ");
@@ -352,6 +376,10 @@ int main(int argc, char *argv[])
                 int loc2 = in.find(" ",loc+1);
                 strcpy(c1.name, in.substr(loc+1).c_str());
             }
+            else if(strcmp(in.c_str(),"take")==0)
+            {
+                c1.messagetype = 1;
+            }
             else
             {
                 printf("%s not a command\n",messagetype);
@@ -368,16 +396,16 @@ int main(int argc, char *argv[])
                 /* Receive a response */
             }  
             instring = false;
-            cout << "-string" << got << " " << got2 << endl;          
+            //cout << "-string" << got << " " << got2 << endl;          
         }
 
-        if(messagethrd.valid() && messagethrd.wait_for(span) == std::future_status::ready)
+        if(got2)
         {
-            cout << "cmd" << got << " " << got2 << endl;
+            //cout << "cmd" << got << " " << got2 << endl;
             got2 = false;
             messagethrd.get();
             incmd = false;
-            cout << "-cmd" << got << " " << got2 << endl;
+            //cout << "-cmd" << got << " " << got2 << endl;
         }
     }
     

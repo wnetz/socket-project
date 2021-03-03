@@ -12,10 +12,9 @@ struct command
 	int messagetype;
 	char name[50];
 	char group[50];
-    char ip[16];
     int port;
-    int code = -1;
-	int code2 = -1;
+    int code = -2;
+	int code2 = -2;
 	char groups[10][50];
 	char message[2000];
 	user groupIM[10];

@@ -8,7 +8,7 @@
 #include <unistd.h>     /* for close() */
 #include <iostream>
 #include <fstream>
-#include <vector>
+#include <vector>       //for remembering users, groups, and halted groups
 #include <string>
 using namespace std;
 void DieWithError(const char *errorMessage) /* External error handling function */
@@ -25,10 +25,10 @@ int main(int argc, char *argv[])
     unsigned int cliAddrLen;         /* Length of incoming message */
     unsigned short echoServPort;     /* Server port */
     int recvMsgSize;                 /* Size of received message */
-    vector<user> users;
-    vector<vector<user>> groups;
-    vector<string> halt;
-	struct command c1;
+    vector<user> users;              // current users
+    vector<vector<user>> groups;     // current groups
+    vector<string> halt;             // groups in msm
+	struct command c1;               // message from user
 
     if (argc != 2)         /* Test for correct number of parameters */
     {
@@ -60,18 +60,27 @@ int main(int argc, char *argv[])
         /* Block until receive message from a client */
         if ((recvMsgSize = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
-        //determin command-----------------------------------------------------------------------
+
+//determin command-------------------------------------------------------------------------------------------------------
         if(c1.messagetype == 2)//register done
         {
             printf("register request from %s\n", inet_ntoa(echoClntAddr.sin_addr));
+            // check if user already exist
             for(int i=0;i<users.size();i++)
             {
+                if(strcmp(users[i].ip,inet_ntoa(echoClntAddr.sin_addr))==0 && users[i].port == c1.port)
+                {
+                    c1.messagetype = 0;
+                    i = users.size();
+                }
+                //user already using givin name
                 if(strcmp(c1.name,users[i].name) == 0)//if user exists fail
                 {
                     c1.messagetype = 1;
+                    i = users.size();
                 }
             }
-            if(c1.messagetype != 1)
+            if(c1.messagetype == 2)
             {
                 c1.messagetype = 0;
                 //add user to users
@@ -79,21 +88,28 @@ int main(int argc, char *argv[])
                 strcpy(newUser.name,c1.name);
                 strcpy(newUser.ip,inet_ntoa(echoClntAddr.sin_addr));
                 newUser.port=c1.port;
-                c1.port = 0;
                 users.push_back(newUser);
                 printf("SUCCESS: added user %s on %s from port %d\n", users[users.size()-1].name,users[users.size()-1].ip,users[users.size()-1].port);
                 strcpy(c1.message,"user added\n");
             }
-            else
+            else if(c1.messagetype == 1)
             {
                 printf("FAILURE: user by the name %s already exists\n",c1.name);
                 strcpy(c1.message,"user already exists\n");
             }
+            else
+            {
+                c1.messagetype = 1;
+                printf("FAILURE: user on that ip is already useing that port\n");
+                strcpy(c1.message,"user on this ip is already using that port\n");
+            }            
+            c1.port = 0;
             
         }
         else if(c1.messagetype == 3)///create done
         {
             printf("create group %s\n", c1.group);
+            // check if group already exists
             for(int i=0;i<groups.size();i++)
             {
                 if(strcmp(groups[i][0].name,c1.group)==0)// if group exists fail
@@ -120,7 +136,208 @@ int main(int argc, char *argv[])
         }
         else if(c1.messagetype == 4)//join done
         {
-            printf("adding %s to group \"%s\"\n", c1.name, c1.group);
+            printf("adding %s to group \"%s\"\n", c1.name, c1.group);            
+            bool inhalt = false;
+            // find if group is in halt
+            for(int i = 0; i < halt.size();i++)
+            {
+                if(strcmp(halt[i].c_str(),c1.group)==0)
+                {
+                    inhalt = true;
+                }
+            }
+            if(!inhalt)
+            {
+                int usr = -1;
+                //find user
+                for(int i=0;i<users.size();i++)
+                {
+                    if(strcmp(users[i].name,c1.name)==0)
+                    {
+                        usr = i;
+                    }
+                }
+                if(usr >= 0)//if user exists
+                {
+                    int grp = -1;
+                    //find group
+                    for(int i=0;i<groups.size();i++)
+                    {
+                        if(strcmp(groups[i][0].name,c1.group)==0)
+                        {
+                            grp = i;
+                        }
+                    }
+                    if(grp >= 0)//if group exists
+                    {
+                        int loc = -1;
+                        // find user in group
+                        for(int i=0;i<groups[grp].size();i++)
+                        {
+                            if(strcmp(groups[grp][i].name,c1.name)==0)
+                            {
+                                loc = i;
+                            }
+                        }
+                        if(loc == -1)//if user not in group
+                        {
+                            c1.messagetype = 0;
+                            struct user curentUser;
+                            strcpy(curentUser.name,users[usr].name);
+                            strcpy(curentUser.ip,users[usr].ip);  
+                            curentUser.port = users[usr].port; 
+                            groups[grp].push_back(curentUser); 
+
+                            printf("SUCCESS: user %s added to group \"%s\"\n",groups[grp][groups[grp].size()-1].name,groups[grp][0].name);
+                            strcpy(c1.message,"user added to group\n");
+                        }
+                        else
+                        {
+                            c1.messagetype = 1;
+                            printf("FAILURE: user %s is already in group \"%s\"\n",c1.name,c1.group);
+                            strcpy(c1.message,"user is alredy in group\n");
+                        }
+                    }
+                    else
+                    {
+                        c1.messagetype = 1;
+                        printf("FAILURE: group \"%s\" does not exists\n",c1.group);
+                        strcpy(c1.message,"no such group\n");
+                    }
+                }
+                else
+                {
+                    c1.messagetype = 1;
+                    printf("FAILURE: user by the name %s does not exists\n",c1.name);
+                    strcpy(c1.message,"no such user\n");
+                } 
+            }
+            else
+            {
+                c1.messagetype = 1;
+                printf("FAILURE: group \"%s\" is in msm\n",c1.group);
+                strcpy(c1.message,"group is in msm\n");
+            }       
+        }
+        else if(c1.messagetype == 5)//query-lists done
+        {
+            printf("geting list of groups\n");
+            c1.messagetype = 0;
+            c1.code = groups.size();
+            c1.code2 = -1;
+            for(int i=0;i<groups.size();i++)//get group names
+            {
+                strcpy(c1.groups[i], groups[i][0].name);
+            }
+            if(c1.code>0)//prevent index out of bounds
+            {                
+                printf("SUCCESS: there are %d groups: %s",c1.code,c1.groups[0]);
+                for(int i=1;i<c1.code;i++)
+                {
+                    cout << ", " << c1.groups[i];
+                }
+                cout << "\n";
+            }
+            else
+            {
+                printf("SUCCESS: there are %d groups\n",c1.code);
+            }
+            
+            strcpy(c1.message,"groups found");
+            
+        }
+        else if(c1.messagetype == 6)//im-start done
+        {
+            printf("getting msm for %s: %s\n", c1.group, c1.name);
+            int usr = -1;
+            //find user
+            for(int i=0;i<users.size();i++)
+            {
+                if(strcmp(users[i].name,c1.name)==0)
+                {
+                    usr = i;
+                }
+            }
+            if(usr >= 0)//if user exists
+            {
+                int grp = -1;
+                //find group
+                for(int i=0;i<groups.size();i++)
+                {
+                    if(strcmp(groups[i][0].name,c1.group)==0)
+                    {
+                        grp = i;
+                    }
+                }
+                if(grp >= 0)//if group exists
+                {
+                    int loc = -1;
+                    // find user in group
+                    for(int i=0;i<groups[grp].size();i++)
+                    {
+                        if(strcmp(groups[grp][i].name,c1.name)==0)
+                        {
+                            loc = i;
+                        }
+                    }
+                    if(loc != -1)//if user in group
+                    {
+                        //reorder group
+                        for(int i=1;i<groups[grp].size();i++)
+                        {
+                            if(i < loc)
+                            {
+                                c1.groupIM[i] = groups[grp][i];
+                            }
+                            else if(i > loc)
+                            {
+                                c1.groupIM[i-1] = groups[grp][i];
+                            }
+                            if(loc == i)
+                            {
+                                c1.groupIM[0]=groups[grp][i];
+                            }
+                            
+                        }
+
+                        c1.code = groups[grp].size()-1;
+                        cout<<c1.code<<" members: " << c1.groupIM[0].name;   
+                        for(int i=1;i<c1.code;i++)
+                        {
+                            cout << ", " << c1.groupIM[i].name;
+                        }
+                        cout << "\n";
+                        //used to check if user is the start of the msm
+                        c1.code2 = c1.code;
+                        //push on halt to stop leave exit and join
+                        halt.push_back(string(groups[grp][0].name));
+                        printf("SUCCESS: user orderd for group \"%s\"\n",c1.group);
+                        strcpy(c1.message,"user orderd for\n");
+                    }
+                    else
+                    {
+                        c1.messagetype = 1;
+                        printf("FAILURE: user %s is not in group \"%s\"\n",c1.name,c1.group);
+                        strcpy(c1.message,"user is not in group\n");
+                    }
+                }
+                else
+                {
+                    c1.messagetype = 1;
+                    printf("FAILURE: group \"%s\" does not exists\n",c1.group);
+                    strcpy(c1.message,"no such group\n");
+                }
+            }
+            else
+            {
+                c1.messagetype = 1;
+                printf("FAILURE: user by the name %s does not exists\n",c1.name);
+                strcpy(c1.message,"no such user\n");
+            }
+        }
+        else if(c1.messagetype == 7)//im-complete done
+        {
+            printf("ending msm for %s: %s\n", c1.group, c1.name);
             int usr = -1;
             //find user
             for(int i=0;i<users.size();i++)
@@ -151,23 +368,34 @@ int main(int argc, char *argv[])
                             loc = i;
                         }
                     }
-                    if(loc == -1)//if user not in group
+                    if(loc != -1)//if user in group
                     {
-                        c1.messagetype = 0;
-                        struct user curentUser;
-                        strcpy(curentUser.name,users[usr].name);
-                        strcpy(curentUser.ip,users[usr].ip);  
-                        curentUser.port = users[usr].port; 
-                        groups[grp].push_back(curentUser); 
 
-                        printf("SUCCESS: user %s added to group \"%s\"\n",groups[grp][groups[grp].size()-1].name,groups[grp][0].name);
-                        strcpy(c1.message,"user added to group\n");
+                        bool inhalt = false;
+                        //check i group is in halt
+                        for(int i=0;i<halt.size();i++)
+                        {
+                            if(strcmp(halt[i].c_str(),c1.group) == 0)
+                            {                                
+                                inhalt = true;
+                                halt.erase(halt.begin()+i);
+                                i = halt.size();
+                            }
+                        }
+                        if(!inhalt)
+                        {
+                            c1.messagetype = 1;
+                            printf("FAILURE: msm not in progress\n",c1.name,c1.group);
+                            strcpy(c1.message,"msm not in progress\n");
+                        }
+                        printf("SUCCESS: group \"%s\" removed from halt\n",c1.group);
+                        strcpy(c1.message,"group removed from halt\n");
                     }
                     else
                     {
                         c1.messagetype = 1;
-                        printf("FAILURE: user %s is already in group \"%s\"\n",c1.name,c1.group);
-                        strcpy(c1.message,"user is alredy in group\n");
+                        printf("FAILURE: user %s is not in group \"%s\"\n",c1.name,c1.group);
+                        strcpy(c1.message,"user is not in group\n");
                     }
                 }
                 else
@@ -182,38 +410,11 @@ int main(int argc, char *argv[])
                 c1.messagetype = 1;
                 printf("FAILURE: user by the name %s does not exists\n",c1.name);
                 strcpy(c1.message,"no such user\n");
-            }        
+            }
         }
-        else if(c1.messagetype == 5)//query-lists done
+        else if(c1.messagetype == 8)//leave FS
         {
-            printf("geting list of groups\n");
-            c1.messagetype = 0;
-            c1.code = groups.size();
-            c1.code2 = 5;
-            for(int i=0;i<groups.size();i++)//get group names
-            {
-                strcpy(c1.groups[i], groups[i][0].name);
-            }
-            if(c1.code>0)//prevent index out of bounds
-            {                
-                printf("SUCCESS: there are %d groups: %s",c1.code,c1.groups[0]);
-                for(int i=1;i<c1.code;i++)
-                {
-                    cout << ", " << c1.groups[i];
-                }
-                cout << "\n";
-            }
-            else
-            {
-                printf("SUCCESS: there are %d groups\n",c1.code);
-            }
-            
-            strcpy(c1.message,"groups found");
-            
-        }
-        else if(c1.messagetype == 6)//im-start FS
-        {
-            printf("getting msm for %s: %s\n", c1.group, c1.name);
+            printf("leaving %s: %s\n", c1.group, c1.name);
             int usr = -1;
             //find user
             for(int i=0;i<users.size();i++)
@@ -247,34 +448,28 @@ int main(int argc, char *argv[])
                     if(loc != -1)//if user in group
                     {
                         c1.messagetype = 0;
-                        for(int i=1;i<groups[grp].size();i++)
-                        {
-                            if(i < loc)
-                            {
-                                c1.groupIM[i] = groups[grp][i];
-                            }
-                            else if(i > loc)
-                            {
-                                c1.groupIM[i-1] = groups[grp][i];
-                            }
-                            if(loc == i)
-                            {
-                                c1.groupIM[0]=groups[grp][i];
-                            }
-                            
-                        }
 
-                        c1.code = groups[grp].size()-1;
-                        cout<<c1.code<<" members: " << c1.groupIM[0].name;   
-                        for(int i=1;i<c1.code;i++)
+                        bool inhalt = false;
+                        //check if group is in halt
+                        for(int i=0;i<halt.size();i++)
                         {
-                            cout << ", " << c1.groupIM[i].name;
+                            if(strcmp(halt[i].c_str(),c1.group) == 0)
+                            {
+                                inhalt = true;
+                            }
                         }
-                        cout << "\n";
-                        c1.code2 = 6;
-                        halt.push_back(string(groups[grp][0].name));
-                        printf("SUCCESS: user orderd for group \"%s\"\n",c1.group);
-                        strcpy(c1.message,"user orderd for\n");
+                        if(inhalt)
+                        {
+                            c1.messagetype = 1;
+                            printf("FAILURE: msm not in progress\n",c1.name,c1.group);
+                            strcpy(c1.message,"msm not in progress\n");
+                        }
+                        else
+                        {
+                            groups[grp].erase(groups[grp].begin()+loc);
+                            printf("SUCCESS: user removed from group \"%s\"\n",c1.group);
+                            strcpy(c1.message,"user removed from group\n");
+                        }                        
                     }
                     else
                     {
@@ -296,14 +491,6 @@ int main(int argc, char *argv[])
                 printf("FAILURE: user by the name %s does not exists\n",c1.name);
                 strcpy(c1.message,"no such user\n");
             }
-        }
-        else if(c1.messagetype == 7)//im-complete FS
-        {
-            cout << "complete\n";
-        }
-        else if(c1.messagetype == 8)//leave FS
-        {
-
         }
         else if(c1.messagetype == 9)//save done
         {
@@ -333,10 +520,10 @@ int main(int argc, char *argv[])
                         saveFile<<groups[i][j].name<<" "<<groups[i][j].ip<<" "<<groups[i][j].port<<"\n";
                     }
                 }
+                c1.port = 0;
 
                 //save file
                 saveFile.close();
-                c1.messagetype = 0;
                 printf("SUCCESS: file \"%s\" created\n", c1.name);
                 strcpy(c1.message,"file created\n");
             }            
@@ -344,16 +531,41 @@ int main(int argc, char *argv[])
         else if(c1.messagetype == 10)//exit todo/FS
         {
             printf("leave request from %s\n", c1.name);
+            bool inhalt = false; 
+            //check if user exists           
             for(int i=0;i<users.size();i++)
             {
-                if(strcmp(c1.name,users[i].name) == 0)//erase user if they exist
+                if(strcmp(c1.name,users[i].name) == 0)//if user exist
                 {
-                    c1.messagetype = 0;
-                    users.erase(users.begin()+i);
+                    //check all groups
+                   for(int j = 0; j < groups.size();j++)
+                    {
+                        //check if user is in group
+                        for(int k = 1; k < groups[j].size();k++)
+                        {
+                            if(strcmp(groups[j][k].name,c1.name)==0)
+                            {
+                                //check if group is in halt
+                                for(int l = 0; l<halt.size();l++)
+                                {
+                                    if(strcmp(halt[i].c_str(),groups[j][0].name)==0)
+                                    {
+                                        cout << "in\n";
+                                        inhalt = true;
+                                    }
+                                }
+                            }
+                        }
+                    }                    
                 }
+                else
+                {
+                    c1.messagetype = 1;
+                }
+                
             }
-            if(c1.messagetype == 0)
-            {
+            if(c1.messagetype == 10)
+            {                
                 for(int i=0;i<groups.size();i++)//search groups
                 {
                     for(int j=1;j<groups[i].size();j++)//search group
@@ -364,23 +576,38 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+                for(int i=0;i<users.size();i++)//search users
+                {                    
+                    if(strcmp(c1.name,users[i].name) == 0)
+                    {
+                        c1.port = 0; 
+                        echoClntAddr.sin_port = htons(users[i].port);
+                        users.erase(users.begin()+i);//from users
+                    }
+                }
                 printf("SUCCESS: user %s removed\n", c1.name);
                 strcpy(c1.message,"user removed\n");
+            }
+            else if(!inhalt)
+            {
+                c1.messagetype = 1;
+                printf("FAILURE: user %s does bot exist\n", c1.name);
+                strcpy(c1.message,"user does not exist\n");
             }
             else
             {
                 c1.messagetype = 1;
-                printf("FAILURE: user %s does not exist\n", c1.name);
-                strcpy(c1.message,"user does not exists\n");
+                printf("FAILURE: user %s is in a msm\n", c1.name);
+                strcpy(c1.message,"user is in an msm\n");
             }
         }
-        //----------------------------------------------------------------------------------------------
-        cout<<"\n";
+//--------------------------------------------------------------------------------------------------------------------------------
 
         /* Send received datagram back to the client */
+        //cout<<"p " << c1.port << endl;
         if(c1.port>0)
         {
-            cout<<c1.name<<endl;
+            //cout<<c1.name<<endl;
             for(int i = 0;i< users.size();i++)
             {
                 if(strcmp(users[i].name,c1.name) == 0)
@@ -388,9 +615,13 @@ int main(int argc, char *argv[])
                     c1.port = users[i].port;
                 }
             }
-            echoClntAddr.sin_port = htons(c1.port);
+            if(c1.port > 0)
+            {
+                echoClntAddr.sin_port = htons(c1.port);
+            }
         }
-        cout<< c1.port << endl;
+        //cout<< "p " << c1.port << endl;
+        cout << endl;
         if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(struct command))
             DieWithError("sendto() sent a different number of bytes than expected");
     }
