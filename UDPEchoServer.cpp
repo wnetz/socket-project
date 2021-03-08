@@ -222,6 +222,7 @@ int main(int argc, char *argv[])
         else if(c1.messagetype == 5)//query-lists done
         {
             printf("geting list of groups\n");
+            cout << echoClntAddr.sin_port << endl;
             c1.messagetype = 0;
             c1.code = groups.size();
             c1.code2 = -1;
@@ -461,8 +462,8 @@ int main(int argc, char *argv[])
                         if(inhalt)
                         {
                             c1.messagetype = 1;
-                            printf("FAILURE: msm not in progress\n",c1.name,c1.group);
-                            strcpy(c1.message,"msm not in progress\n");
+                            printf("FAILURE: msm in progress\n",c1.name,c1.group);
+                            strcpy(c1.message,"msm in progress\n");
                         }
                         else
                         {
@@ -530,15 +531,17 @@ int main(int argc, char *argv[])
         }
         else if(c1.messagetype == 10)//exit todo/FS
         {
-            printf("leave request from %s\n", c1.name);
+            printf("exit request from %s\n", c1.name);
             bool inhalt = false; 
+            bool exists = false;
             //check if user exists           
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(c1.name,users[i].name) == 0)//if user exist
                 {
+                    exists = true;
                     //check all groups
-                   for(int j = 0; j < groups.size();j++)
+                    for(int j = 0; j < groups.size();j++)
                     {
                         //check if user is in group
                         for(int k = 1; k < groups[j].size();k++)
@@ -548,7 +551,7 @@ int main(int argc, char *argv[])
                                 //check if group is in halt
                                 for(int l = 0; l<halt.size();l++)
                                 {
-                                    if(strcmp(halt[i].c_str(),groups[j][0].name)==0)
+                                    if(strcmp(halt[l].c_str(),groups[j][0].name)==0)
                                     {
                                         cout << "in\n";
                                         inhalt = true;
@@ -558,13 +561,9 @@ int main(int argc, char *argv[])
                         }
                     }                    
                 }
-                else
-                {
-                    c1.messagetype = 1;
-                }
                 
             }
-            if(c1.messagetype == 10)
+            if(exists && !inhalt)
             {                
                 for(int i=0;i<groups.size();i++)//search groups
                 {
@@ -581,7 +580,7 @@ int main(int argc, char *argv[])
                     if(strcmp(c1.name,users[i].name) == 0)
                     {
                         c1.port = 0; 
-                        echoClntAddr.sin_port = htons(users[i].port);
+                        //echoClntAddr.sin_port = htons(users[i].port);
                         users.erase(users.begin()+i);//from users
                     }
                 }
@@ -605,7 +604,7 @@ int main(int argc, char *argv[])
 
         /* Send received datagram back to the client */
         //cout<<"p " << c1.port << endl;
-        if(c1.port>0)
+        /*if(c1.port>0)
         {
             //cout<<c1.name<<endl;
             for(int i = 0;i< users.size();i++)
@@ -619,7 +618,7 @@ int main(int argc, char *argv[])
             {
                 echoClntAddr.sin_port = htons(c1.port);
             }
-        }
+        }*/
         //cout<< "p " << c1.port << endl;
         cout << endl;
         if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(struct command))

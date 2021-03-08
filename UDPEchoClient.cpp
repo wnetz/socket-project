@@ -20,10 +20,6 @@
 using namespace std;
 int port;
 bool done = false;
-bool got = false;
-bool got2 = false;
-bool rc = false;
-bool take = false;
 string input;
 struct sockaddr_in echoServAddr; /* Echo server address */
 
@@ -60,67 +56,64 @@ void messagethread()
         DieWithError("bind() failed: a user on that ip is already using that port");
     fromSize = sizeof(fromAddr);
 
-    // get message
-    if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
-        DieWithError("recvfrom() failed");
-    rc = true;
-    //cout << "in cmd" << got << " " << got2 << endl;
-    //SUCCESS
-    if(c1.messagetype != 1)
+    while(!done)//loop while not done
     {
-        cout<<c1.code<<" "<<c1.code2<<endl;
-        if(c1.messagetype != 6)
+        // get message
+        if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
+            DieWithError("recvfrom() failed");
+        
+        // print who is left in chain and message
+        if(c1.code > 0)
         {
-            printf("SUCCESS: %s\n",c1.message);
+            cout << c1.group <<" messege from " << c1.name << ": " << c1.message << endl;
+            cout<<"members: " << c1.groupIM[0].name;
         }
-        if(strcmp(c1.message,"user removed\n") == 0)
+        if(c1.code == -2)//if main thread is ready to exit
         {
-            done = true;
+            cout<<"end thread\n";
+            close(sock);
         }
-        if(c1.code > -2)
-        {
-            if(c1.code2 == -1)//query
+        else
+        {            
+            for(int i=1;i<c1.code;i++)
             {
-                cout<<"groups: " << c1.groups[0];
-                for(int i=1;i<c1.code;i++)
-                {
-                    cout << ", " << c1.groups[i];
-                }
-                cout << "\n";
+                cout << ", " << c1.groupIM[i].name;
             }
-            else//im start
+            cout << "\n";
+
+            //subtract one from number of people
+            c1.code = c1.code - 1;
+            if(c1.code == -1)
             {
-                bool start = false;
-                cout << c1.code<<endl;
-                if(c1.code2 == c1.code)// if start of msm
+                c1.code = -2;
+                c1.code2 = -2;
+                //im-complete code
+                c1.messagetype = 7;
+                //send to server
+                if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
+                    DieWithError("sendto() sent a different number of bytes than expected");
+                //recive response from server
+                if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
+                    DieWithError("recvfrom() failed");
+                if(c1.messagetype != 1)
                 {
-                    take = true;
-                    cout << "enter message: "; 
-                    while(take){}
-                    strcpy(c1.message, input.c_str());
-                    cout<<endl;
-                    start = true;
+                    printf("SUCCESS: %s\n",c1.message);
                 }
                 else
                 {
-                    cout <<"messege: " << c1.message << endl;
+                    printf("FAILURE: %s\n",c1.message);
                 }
-                // print who is left in chain
-                cout<<"members: " << c1.groupIM[0].name;
-                for(int i=1;i<c1.code;i++)
-                {
-                    cout << ", " << c1.groupIM[i].name;
-                }
-                cout << "\n";
-
-                //subtract one from number of people
-                c1.code = c1.code - 1;
-
+            }
+            else
+            {
                 //next in chain
                 msmIP = c1.groupIM[c1.code].ip;
                 msmPort = c1.groupIM[c1.code].port;
 
-                printf( "sending msg to %s on port %d\n", msmIP, msmPort );
+                //pause to show that leave, exit, and join are working properly
+                cout << "pause for 5 seconds before sending message..."<<endl;
+                this_thread::sleep_for (std::chrono::seconds(5));
+                printf( "sending msg to %s on port %d\n\n", msmIP, msmPort );
 
                 memset(&msmAddr, 0, sizeof(msmAddr));    /* Zero out structure */
                 msmAddr.sin_family = AF_INET;                 /* Internet addr family */
@@ -130,53 +123,15 @@ void messagethread()
                 //send to next
                 if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &msmAddr, sizeof(msmAddr)) != sizeof(struct command))
                         DieWithError("sendto() sent a different number of bytes than expected");
-                if(start)
-                {
-                    cout << "msg sent\n";
-                    //wait for msm to come back
-                    if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
-                        DieWithError("recvfrom() failed");
-                    cout << "msg receved\n";
-                    //send im complete to server
-                    c1.code = -2;
-                    c1.code2 = -2;
-                    c1.messagetype = 7;
-                    if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
-                        DieWithError("sendto() sent a different number of bytes than expected");
-                }
-            }
+            }   
         }
-        
-        //reset codes
-        c1.code = -2;
-        c1.code2 = -2;
     }
-    else
-    {
-        printf("FAILURE: %s",c1.message);
-    }    
-    got2 = true;
-    //cout << "done cmd" << got << " " << got2 << endl;
-    close(sock);
     return;
-}
-
-string getString()
-{
-    //cout << "in string\n";
-    //cout << "\nEnter command-----: ";
-    string input;
-    getline(cin, input);
-    //cout << "\n";
-    got = true;
-    //cout << "done string" << got << " " << got2 << endl;
-    return input;
 }
 
 int main(int argc, char *argv[])
 {
-	int sock;                        /* Socket descriptor */
-    
+	int sock;                        /* Socket descriptor */    
     struct sockaddr_in msmAddr;
     struct sockaddr_in fromAddr;     /* Source address of echo */
     unsigned short echoServPort;     /* Echo server port */
@@ -187,13 +142,7 @@ int main(int argc, char *argv[])
     int nBytes;              		 /* Length of received response */
     struct command c1;              //message that is sent
     fd_set readfds;
-    int num_readable;
-    struct timeval tv;
-    int num_bytes;
-    char buf[MAXBYTES];
     int fd_stdin;
-    bool incmd = false;
-    bool instring = false;
 
     fd_stdin = fileno(stdin);
 
@@ -264,152 +213,171 @@ int main(int argc, char *argv[])
             printf("FAILURE: %s",c1.message);
         }
     } 
-    while (c1.messagetype!=0);
+    while (c1.messagetype!=0);//loop while init failed
     c1.port = 1;
     //----------------------------------------------------------------------------------------------
 
     
     cin.ignore(numeric_limits<streamsize>::max(),'\n'); 
     std::chrono::milliseconds span (100);
-    future<void> messagethrd;
+    future<void> messagethrd = async(launch::async, messagethread);;
     std::future<string> futureObj;
  
 
     //loop while conected
     while(!done)
     {
-        //std::promise<string> promiseObj;
-        if(!incmd)
+        string in;
+        getline(cin, in);
+        int loc = in.find(" ");
+        char messagetype[20];
+        strcpy(messagetype, in.substr(0,loc).c_str());
+        
+        //logic for server commands---------------------------------------------------------------------
+        if(strcmp(messagetype,"create") == 0)
         {
-            incmd = true;
-            messagethrd = async(launch::async, messagethread); 
-        }
-        if(!instring)
+            int loc2 = in.find(" ",loc+1);
+            c1.messagetype = 3;
+            strcpy(c1.group, in.substr(loc+1).c_str());
+        }            
+        else if(strcmp(messagetype,"join") == 0)
         {
-            instring = true;
-            futureObj = async(getString);
+            c1.messagetype = 4;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
+            loc = loc2;
+            loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }            
+        else if(strcmp(messagetype,"query-lists") == 0)
+        {
+            c1.messagetype = 5;
         }
-        //std::thread th(getString, &promiseObj);
-        if(got) 
-        { 
-            //cout << "string" << got << " " << got2 << endl;
-            got = false;
-            string in;
-            if(take)
+        else if(strcmp(messagetype,"im-start") == 0)
+        {
+            c1.messagetype = 6;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
+            loc = loc2;
+            loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }
+        else if(strcmp(messagetype,"im-complete") == 0)
+        {
+            c1.messagetype = 7;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
+            loc = loc2;
+            loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }
+        else if(strcmp(messagetype,"leave") == 0)
+        {
+            c1.messagetype = 8;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
+            loc = loc2;
+            loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }            
+        else if(strcmp(messagetype,"save") == 0)
+        {
+            c1.messagetype = 9;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }
+        else if(strcmp(messagetype,"exit") == 0)
+        {
+            c1.messagetype = 10;
+            int loc2 = in.find(" ",loc+1);
+            strcpy(c1.name, in.substr(loc+1).c_str());
+        }
+        else
+        {
+            printf("%s not a command\n",messagetype);
+            c1.messagetype = 1;
+        }
+        //----------------------------------------------------------------------------------------------
+
+        if(c1.messagetype!=1)
+        {
+            /* Send the struct to the server */
+            if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
+                DieWithError("sendto() sent a different number of bytes than expected");
+
+            /* Receive a response */
+            if ((nBytes = recvfrom(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &fromAddr, &fromSize)) > sizeof(struct command) )
+                DieWithError("recvfrom() failed");
+
+            if(c1.messagetype != 1)//if not fail
             {
-                input = futureObj.get();
-                take = false;
-                in = "take";
+                if(c1.messagetype != 6)//if not im-start
+                {
+                    printf("SUCCESS: %s\n",c1.message);
+                    if(strcmp(c1.message,"user removed\n") == 0)//if exit
+                    {
+                        done = true;
+                        c1.code = -2;
+                        //send message to thread, so it will not be halted and program can end
+                        echoServAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK );
+                        echoServAddr.sin_port = htons(port);
+                        if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
+                            DieWithError("sendto() sent a different number of bytes than expected");
+                    }
+                    if(c1.code2 == -1)//query
+                    {
+                        cout<<"groups: " << c1.groups[0];
+                        for(int i=1;i<c1.code;i++)
+                        {
+                            cout << ", " << c1.groups[i];
+                        }
+                        cout << "\n";
+                    }
+                    //reset codes
+                    c1.code = -2;
+                    c1.code2 = -2;
+                }
+                else//im start
+                {
+                    cout << "enter message: "; 
+                    getline(cin, in);
+                    strcpy(c1.message,in.c_str());
+                    cout<<endl;
+                    // print who is left in chain
+                    cout<<"members: " << c1.groupIM[0].name;
+                    for(int i=1;i<c1.code;i++)
+                    {
+                        cout << ", " << c1.groupIM[i].name;
+                    }
+                    cout << "\n";
+
+                    //subtract one from number of people
+                    c1.code = c1.code - 1;
+
+                    //next in chain
+                    msmIP = c1.groupIM[c1.code].ip;
+                    msmPort = c1.groupIM[c1.code].port;
+
+                    printf( "sending msg to %s on port %d\n", msmIP, msmPort );
+
+                    memset(&msmAddr, 0, sizeof(msmAddr));
+                    msmAddr.sin_family = AF_INET;
+                    msmAddr.sin_addr.s_addr = inet_addr(msmIP);
+                    msmAddr.sin_port   = htons(msmPort);
+                    
+                    //send to next
+                    if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &msmAddr, sizeof(msmAddr)) != sizeof(struct command))
+                            DieWithError("sendto() sent a different number of bytes than expected");
+                }
             }
             else
-            {                
-                in = futureObj.get();
-            }
-            
-            //th.join();
-            char echoBuffer[100];
-            int loc = in.find(" ");
-            char messagetype[20];
-            strcpy(messagetype, in.substr(0,loc).c_str());
-            
-            //logic for server commands---------------------------------------------------------------------
-            //done
-            if(strcmp(messagetype,"create") == 0)
             {
-                int loc2 = in.find(" ",loc+1);
-                c1.messagetype = 3;
-                strcpy(c1.group, in.substr(loc+1).c_str());
-            }            
-            //done
-            else if(strcmp(messagetype,"join") == 0)
-            {
-                c1.messagetype = 4;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
-                loc = loc2;
-                loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }            
-            //done
-            else if(strcmp(messagetype,"query-lists") == 0)
-            {
-                c1.messagetype = 5;
-            }
-            else if(strcmp(messagetype,"im-start") == 0)
-            {
-                c1.messagetype = 6;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
-                loc = loc2;
-                loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }
-            else if(strcmp(messagetype,"im-complete") == 0)
-            {
-                c1.messagetype = 7;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
-                loc = loc2;
-                loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }
-            else if(strcmp(messagetype,"leave") == 0)
-            {
-                c1.messagetype = 8;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.group, in.substr(loc+1,loc2-loc-1).c_str());
-                loc = loc2;
-                loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }            
-            //done
-            else if(strcmp(messagetype,"save") == 0)
-            {
-                c1.messagetype = 9;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }
-            //done
-            else if(strcmp(messagetype,"exit") == 0)
-            {
-                c1.messagetype = 10;
-                int loc2 = in.find(" ",loc+1);
-                strcpy(c1.name, in.substr(loc+1).c_str());
-            }
-            else if(strcmp(in.c_str(),"take")==0)
-            {
-                c1.messagetype = 1;
-            }
-            else
-            {
-                printf("%s not a command\n",messagetype);
-                c1.messagetype = 1;
-            }
-            //----------------------------------------------------------------------------------------------
-
-            if(c1.messagetype!=1)
-            {
-                /* Send the struct to the server */
-                if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) != sizeof(struct command))
-                    DieWithError("sendto() sent a different number of bytes than expected");
-
-                /* Receive a response */
-            }  
-            instring = false;
-            //cout << "-string" << got << " " << got2 << endl;          
-        }
-
-        if(got2)
-        {
-            //cout << "cmd" << got << " " << got2 << endl;
-            got2 = false;
-            messagethrd.get();
-            incmd = false;
-            //cout << "-cmd" << got << " " << got2 << endl;
-        }
+                printf("FAILURE: %s",c1.message);
+            } 
+        }  
     }
     
-    
+    messagethrd.get();
     close(sock);
     exit(0);
 }
