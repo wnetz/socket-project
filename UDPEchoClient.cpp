@@ -227,6 +227,7 @@ int main(int argc, char *argv[])
     //loop while conected
     while(!done)
     {
+        cout<<"enter a command: ";
         string in;
         getline(cin, in);
         int loc = in.find(" ");
@@ -372,7 +373,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                printf("FAILURE: %s",c1.message);
+                printf("FAILURE: %s\n",c1.message);
             } 
         }  
     }

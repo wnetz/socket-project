@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
         {
             printf("register request from %s\n", inet_ntoa(echoClntAddr.sin_addr));
             // check if user already exist
+            cout<<"check if user exists\n";
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(users[i].ip,inet_ntoa(echoClntAddr.sin_addr))==0 && users[i].port == c1.port)
@@ -110,6 +111,7 @@ int main(int argc, char *argv[])
         {
             printf("create group %s\n", c1.group);
             // check if group already exists
+            cout<<"check if group exists\n";
             for(int i=0;i<groups.size();i++)
             {
                 if(strcmp(groups[i][0].name,c1.group)==0)// if group exists fail
@@ -139,6 +141,7 @@ int main(int argc, char *argv[])
             printf("adding %s to group \"%s\"\n", c1.name, c1.group);            
             bool inhalt = false;
             // find if group is in halt
+            cout<<"check if group is in halt\n";
             for(int i = 0; i < halt.size();i++)
             {
                 if(strcmp(halt[i].c_str(),c1.group)==0)
@@ -150,6 +153,7 @@ int main(int argc, char *argv[])
             {
                 int usr = -1;
                 //find user
+                cout<<"check if user exists\n";
                 for(int i=0;i<users.size();i++)
                 {
                     if(strcmp(users[i].name,c1.name)==0)
@@ -161,6 +165,7 @@ int main(int argc, char *argv[])
                 {
                     int grp = -1;
                     //find group
+                    cout<<"check if group exists\n";
                     for(int i=0;i<groups.size();i++)
                     {
                         if(strcmp(groups[i][0].name,c1.group)==0)
@@ -172,6 +177,7 @@ int main(int argc, char *argv[])
                     {
                         int loc = -1;
                         // find user in group
+                        cout<<"check if user is in group\n";
                         for(int i=0;i<groups[grp].size();i++)
                         {
                             if(strcmp(groups[grp][i].name,c1.name)==0)
@@ -222,7 +228,6 @@ int main(int argc, char *argv[])
         else if(c1.messagetype == 5)//query-lists done
         {
             printf("geting list of groups\n");
-            cout << echoClntAddr.sin_port << endl;
             c1.messagetype = 0;
             c1.code = groups.size();
             c1.code2 = -1;
@@ -252,6 +257,7 @@ int main(int argc, char *argv[])
             printf("getting msm for %s: %s\n", c1.group, c1.name);
             int usr = -1;
             //find user
+            cout<<"check if user exists\n";
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(users[i].name,c1.name)==0)
@@ -263,6 +269,7 @@ int main(int argc, char *argv[])
             {
                 int grp = -1;
                 //find group
+                cout<<"check if group exists\n";
                 for(int i=0;i<groups.size();i++)
                 {
                     if(strcmp(groups[i][0].name,c1.group)==0)
@@ -274,6 +281,7 @@ int main(int argc, char *argv[])
                 {
                     int loc = -1;
                     // find user in group
+                    cout<<"check if user is in group\n";
                     for(int i=0;i<groups[grp].size();i++)
                     {
                         if(strcmp(groups[grp][i].name,c1.name)==0)
@@ -284,6 +292,7 @@ int main(int argc, char *argv[])
                     if(loc != -1)//if user in group
                     {
                         //reorder group
+                        cout<<"reorder names\n";
                         for(int i=1;i<groups[grp].size();i++)
                         {
                             if(i < loc)
@@ -341,6 +350,7 @@ int main(int argc, char *argv[])
             printf("ending msm for %s: %s\n", c1.group, c1.name);
             int usr = -1;
             //find user
+            cout<<"check if user exists\n";
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(users[i].name,c1.name)==0)
@@ -352,6 +362,7 @@ int main(int argc, char *argv[])
             {
                 int grp = -1;
                 //find group
+                cout<<"check if group exists\n";
                 for(int i=0;i<groups.size();i++)
                 {
                     if(strcmp(groups[i][0].name,c1.group)==0)
@@ -362,6 +373,7 @@ int main(int argc, char *argv[])
                 if(grp >= 0)//if group exists
                 {
                     int loc = -1;
+                    cout<<"check if userr is in group\n";
                     for(int i=0;i<groups[grp].size();i++)
                     {
                         if(strcmp(groups[grp][i].name,c1.name)==0)
@@ -374,6 +386,7 @@ int main(int argc, char *argv[])
 
                         bool inhalt = false;
                         //check i group is in halt
+                        cout<<"check if group is in halt\n";
                         for(int i=0;i<halt.size();i++)
                         {
                             if(strcmp(halt[i].c_str(),c1.group) == 0)
@@ -418,6 +431,7 @@ int main(int argc, char *argv[])
             printf("leaving %s: %s\n", c1.group, c1.name);
             int usr = -1;
             //find user
+            cout<<"check if user exists\n";
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(users[i].name,c1.name)==0)
@@ -429,6 +443,7 @@ int main(int argc, char *argv[])
             {
                 int grp = -1;
                 //find group
+                cout<<"check if group exists\n";
                 for(int i=0;i<groups.size();i++)
                 {
                     if(strcmp(groups[i][0].name,c1.group)==0)
@@ -439,6 +454,7 @@ int main(int argc, char *argv[])
                 if(grp >= 0)//if group exists
                 {
                     int loc = -1;
+                    cout<<"check if user is in group\n";
                     for(int i=0;i<groups[grp].size();i++)
                     {
                         if(strcmp(groups[grp][i].name,c1.name)==0)
@@ -452,6 +468,7 @@ int main(int argc, char *argv[])
 
                         bool inhalt = false;
                         //check if group is in halt
+                        cout<<"check if group is in halt\n";
                         for(int i=0;i<halt.size();i++)
                         {
                             if(strcmp(halt[i].c_str(),c1.group) == 0)
@@ -467,6 +484,7 @@ int main(int argc, char *argv[])
                         }
                         else
                         {
+                            cout<<"remove from group\n";
                             groups[grp].erase(groups[grp].begin()+loc);
                             printf("SUCCESS: user removed from group \"%s\"\n",c1.group);
                             strcpy(c1.message,"user removed from group\n");
@@ -534,13 +552,15 @@ int main(int argc, char *argv[])
             printf("exit request from %s\n", c1.name);
             bool inhalt = false; 
             bool exists = false;
-            //check if user exists           
+            //check if user exists 
+            cout<<"check if user exists\n";          
             for(int i=0;i<users.size();i++)
             {
                 if(strcmp(c1.name,users[i].name) == 0)//if user exist
                 {
                     exists = true;
                     //check all groups
+                    cout<<"check if user is in group that is in halt\n";
                     for(int j = 0; j < groups.size();j++)
                     {
                         //check if user is in group
@@ -564,7 +584,8 @@ int main(int argc, char *argv[])
                 
             }
             if(exists && !inhalt)
-            {                
+            {    
+                cout<<"remove userr from groups\n";            
                 for(int i=0;i<groups.size();i++)//search groups
                 {
                     for(int j=1;j<groups[i].size();j++)//search group
@@ -575,6 +596,7 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+                cout<<"remove user from users\n";
                 for(int i=0;i<users.size();i++)//search users
                 {                    
                     if(strcmp(c1.name,users[i].name) == 0)
@@ -602,24 +624,6 @@ int main(int argc, char *argv[])
         }
 //--------------------------------------------------------------------------------------------------------------------------------
 
-        /* Send received datagram back to the client */
-        //cout<<"p " << c1.port << endl;
-        /*if(c1.port>0)
-        {
-            //cout<<c1.name<<endl;
-            for(int i = 0;i< users.size();i++)
-            {
-                if(strcmp(users[i].name,c1.name) == 0)
-                {
-                    c1.port = users[i].port;
-                }
-            }
-            if(c1.port > 0)
-            {
-                echoClntAddr.sin_port = htons(c1.port);
-            }
-        }*/
-        //cout<< "p " << c1.port << endl;
         cout << endl;
         if (sendto(sock, &c1, sizeof(struct command), 0, (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(struct command))
             DieWithError("sendto() sent a different number of bytes than expected");
